@@ -1,0 +1,36 @@
+[package]
+name = "dex2rs"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+description = "Convert selected methods of an Android APK or DEX into Rust/JNI native code, then build, repack and sign"
+keywords = ["android", "dex", "cli", "obfuscation", "jni"]
+categories = ["command-line-utilities", "development-tools", "compilers"]
+
+[dependencies]
+# The version is what `cargo publish` needs to resolve the crate from the
+# registry; the path is what a build in this workspace uses.
+dex2rs-core = { version = "0.1.0", path = "../dex2rs-core" }
+# Needed for `vendored::SOURCES` / `vendored::STANDALONE_MANIFEST` only: the runtime
+# a generated project vendors is this crate's own sources, so what lands in the
+# project is exactly the runtime this binary was built against.
+dex2rs-runtime = { version = "0.1.0", path = "../dex2rs-runtime", features = ["vendor-table"] }
+anyhow = "1.0.104"
+clap = { version = "4.6.6", features = ["derive"] }
+env_logger = "0.11.11"
+log = "0.4.34"
+rayon = "1.11.0"
+regex = "1.13.1"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+smali = "0.6.2"
+tempfile = "3.27.0"
+walkdir = "2.5.0"
+
+[dev-dependencies]
+dex2rs-core = { path = "../dex2rs-core" }

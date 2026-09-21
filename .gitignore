@@ -1,0 +1,47 @@
+# ---------------------------------------------------------------- build output
+# `target/` also holds the *generated* crate for each converted app (the
+# scaffold, its `src/methods.rs`, the built .so and the intermediate APKs), so it
+# reaches gigabytes. It is fully reproducible: `dex2rs -i <apk> ...` regenerates
+# it. Note that `d2c/project/target` and any nested crate target are covered too.
+target/
+
+# ------------------------------------------------------------------- artifacts
+# Nothing below is source: the input APK, the repacked APKs we produce, the
+# generated project archive and the signature keystore are all outputs or local
+# state. `app-release.apk` in particular is a third-party app binary and is not
+# ours to publish.
+*.apk
+*.zip
+*.so
+
+# --------------------------------------------------------------- local keystore
+# `keystore/debug.keystore` is the *working-directory default* that `dcc.cfg` and
+# `SignatureConfig::default` point at. The key itself is embedded in the CLI
+# (`dex2rs/assets/debug.keystore`, which must stay tracked), so a copy here is
+# pure local state: drop your own key at the default path to override the embedded
+# one, and it never gets committed. Root-level only, so the asset above is not
+# caught by this rule.
+/keystore/
+
+# ----------------------------------------------------------------------- logs
+*.log
+trace.txt
+
+# ------------------------------------------------------------- python bytecode
+__pycache__/
+*.pyc
+
+# ---------------------------------------------------- vendored reference d2c
+# `d2c/` is a clone of the public reference compiler
+# (https://github.com/Kirlif/d2c) kept for differential testing only: the
+# converter itself is pure Rust and does not need it to build. It carries its own
+# 35 MB .git and multi-megabyte jars, so it is not vendored here. Restore it with
+#   git clone https://github.com/Kirlif/d2c d2c
+d2c/
+
+# ----------------------------------------------------------------- local state
+.tmp/
+
+# ------------------------------------------------------------- editor / OS
+.DS_Store
+*~

@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400" role="img" aria-label="dex2rs watchdog output in logcat: FREEZE versus PARKED">
+  <title>watchdog in logcat</title>
+  <defs>
+    <linearGradient id="tbg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0a1022"/>
+      <stop offset="1" stop-color="#0e1430"/>
+    </linearGradient>
+    <linearGradient id="tbar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#1b2350"/>
+      <stop offset="1" stop-color="#141a3c"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="400" rx="26" fill="url(#tbg)"/>
+  <rect x="0.5" y="0.5" width="1199" height="399" rx="25.5" fill="none" stroke="#2a3358"/>
+  <rect x="0" y="0" width="1200" height="52" rx="26" fill="url(#tbar)"/>
+  <rect x="0" y="26" width="1200" height="26" fill="url(#tbar)"/>
+  <circle cx="34" cy="26" r="6" fill="#ff5f57"/>
+  <circle cx="56" cy="26" r="6" fill="#febc2e"/>
+  <circle cx="78" cy="26" r="6" fill="#28c840"/>
+  <text x="600" y="32" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#8b9ac9">adb logcat -s dex2rs:D — a converted method that stops names itself</text>
+
+  <text x="34" y="94" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" fill="#6f7dab">$ adb logcat -d | grep dex2rs</text>
+
+  <rect x="34" y="116" width="1132" height="46" rx="8" fill="#1a1030"/>
+  <text x="48" y="145" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" fill="#ff8f7a">E dex2rs: FREEZE 2s in MainActivity.onCreate at state 17</text>
+  <text x="700" y="145" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#9a7fbf">a compiler bug — report it</text>
+
+  <rect x="34" y="172" width="1132" height="46" rx="8" fill="#101a30"/>
+  <text x="48" y="201" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" fill="#7fd6ff">D dex2rs: PARKED 8s in NativeEngine.processLgl at state 3</text>
+  <text x="716" y="201" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#8b9ac9">a stopwatch, not a fault</text>
+
+  <rect x="34" y="228" width="1132" height="46" rx="8" fill="#101a30"/>
+  <text x="48" y="257" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" fill="#7fd6ff">D dex2rs: PARKED 61s in NativeEngine.processLgl at state 3</text>
+  <text x="734" y="257" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#8b9ac9">this one is the hang</text>
+
+  <rect x="34" y="284" width="1132" height="46" rx="8" fill="#0d1a2c"/>
+  <text x="48" y="313" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" fill="#3ee0c8">D dex2rs: HANG DUMP — SIGQUIT sent, every thread's Java stack follows</text>
+  <text x="836" y="313" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#8b9ac9">no root needed</text>
+
+  <text x="34" y="364" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#6f7dab">read it back against the tree that built the apk:</text>
+  <text x="34" y="386" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#9fb0d9">python3 tools/watchdog_log.py target/dist-plain wd.log</text>
+</svg>

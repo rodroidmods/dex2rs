@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="500" viewBox="0 0 1200 500" role="img" aria-label="APK size by opt-level and packaging, from 20.57 MB down to 10.24 MB">
+  <title>APK size: packaging moves it more than opt-level</title>
+  <defs>
+    <linearGradient id="sbg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#090e20"/>
+      <stop offset="1" stop-color="#0f1533"/>
+    </linearGradient>
+    <linearGradient id="sgrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7c5cff"/>
+      <stop offset="0.5" stop-color="#4aa8ff"/>
+      <stop offset="1" stop-color="#3ee0c8"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="500" rx="26" fill="url(#sbg)"/>
+  <rect x="0.5" y="0.5" width="1199" height="499" rx="25.5" fill="none" stroke="#2a3358"/>
+
+  <text x="32" y="52" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="21" font-weight="700" fill="#e8ecff">The APK is the number users see</text>
+  <text x="32" y="78" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#8b9ac9">same 3 729 converted methods, arm64, one ABI — only the build settings change</text>
+  <line x1="32" y1="92" x2="1168" y2="92" stroke="#262f57"/>
+
+  <rect x="24" y="100" width="1152" height="332" rx="10" fill="#0c1226" stroke="#1e2749"/>
+
+  <text x="32" y="130" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" fill="#9fb0d9">opt-level 3, stored</text>
+  <rect x="320" y="112" width="764" height="30" rx="6" fill="url(#sgrad)" fill-opacity="0.42"/>
+  <text x="1096" y="132" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" fill="#8b9ac9">20.57 MB</text>
+
+  <text x="32" y="190" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" fill="#9fb0d9">opt-level z, stored</text>
+  <rect x="320" y="172" width="589" height="30" rx="6" fill="url(#sgrad)" fill-opacity="0.42"/>
+  <text x="921" y="192" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" fill="#8b9ac9">15.85 MB</text>
+
+  <text x="32" y="250" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" fill="#9fb0d9">opt-level 3, --compress-libs</text>
+  <rect x="320" y="232" width="468" height="30" rx="6" fill="url(#sgrad)" fill-opacity="0.42"/>
+  <text x="800" y="252" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" fill="#8b9ac9">12.60 MB</text>
+
+  <text x="32" y="310" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" fill="#9fb0d9">3 + --outline-common, -C</text>
+  <rect x="320" y="292" width="403" height="30" rx="6" fill="url(#sgrad)" fill-opacity="0.42"/>
+  <text x="735" y="312" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" fill="#8b9ac9">10.85 MB</text>
+
+  <rect x="24" y="336" width="1152" height="60" rx="10" fill="#111a38" stroke="#3a4680"/>
+  <text x="32" y="374" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" fill="#dbe4ff">opt-level z, --compress-libs</text>
+  <rect x="320" y="350" width="380" height="32" rx="6" fill="url(#sgrad)"/>
+  <text x="712" y="374" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" fill="#e8ecff">10.24 MB</text>
+  <rect x="806" y="352" width="86" height="28" rx="14" fill="#1b2350" stroke="#4aa8ff"/>
+  <text x="849" y="371" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13" fill="#7fd6ff">default</text>
+
+  <text x="32" y="456" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#6f7dab">-C deflates lib/**/*.so — a stored library costs its full size in the download</text>
+  <text x="32" y="480" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#6f7dab">tools/outline_check.py reprints the fragment and bl counts behind these numbers</text>
+</svg>

@@ -1,0 +1,57 @@
+[package]
+name = "dex2rs-runtime"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+description = "On-device JNI runtime that generated dex2rs code links against (port of d2c's project/jni/nc)"
+keywords = ["android", "jni", "dex", "obfuscation", "runtime"]
+categories = ["development-tools", "external-ffi-bindings"]
+
+# docs.rs builds every feature: the per-instruction `trace` hooks are public API
+# and are `cfg`-gated, so a default-feature build would leave them out of the
+# documentation entirely.
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[lib]
+crate-type = ["rlib", "staticlib"]
+
+# `tools/host_jvm_check.sh` loads this one into a desktop JVM so the JNI helpers
+# can be exercised against a real VM (see the example's own documentation).
+[[example]]
+name = "jvm_probe"
+crate-type = ["cdylib"]
+
+# The vendored-source table only exists with the feature on, so the test that
+# guards it is skipped unless it is named:
+# `cargo test -p dex2rs-runtime --features vendor-table`.
+[[test]]
+name = "vendored_sources"
+required-features = ["vendor-table"]
+
+[features]
+# Emit the per-instruction `LOGD` traces the original wrapped in `#ifdef DEBUG`.
+trace = []
+# Expose `vendored::SOURCES` / `vendored::STANDALONE_MANIFEST`, the table `dex2rs`
+# uses to vendor this crate into a generated project. Off by default: a generated
+# project's own copy of the runtime declares the feature (so `cfg` stays quiet)
+# but never enables it.
+vendor-table = []
+
+[dependencies]
+jni-sys = "0.4.1"
+log = "0.4.34"
+
+[target.'cfg(target_os = "android")'.dependencies]
+# `default-features = false` drops android_logger's `regex` feature, which is
+# on by default and pulls `regex` + `regex-automata` + `aho-corasick` + `memchr`
+# into every generated `libstub.so`. Nothing here uses a regex log filter -- the
+# runtime sets one fixed level -- so the engine is dead weight in the shipped
+# library.
+android_logger = { version = "0.15.1", default-features = false }

@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520" role="img" aria-label="dex2rs pipeline: compile, build, patch and sign">
+  <title>dex2rs pipeline</title>
+  <defs>
+    <linearGradient id="pbg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#090e20"/>
+      <stop offset="1" stop-color="#0f1533"/>
+    </linearGradient>
+    <linearGradient id="pmain" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7c5cff"/>
+      <stop offset="0.5" stop-color="#4aa8ff"/>
+      <stop offset="1" stop-color="#3ee0c8"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="520" rx="26" fill="url(#pbg)"/>
+  <rect x="0.5" y="0.5" width="1199" height="519" rx="25.5" fill="none" stroke="#2a3358"/>
+
+  <text x="40" y="52" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#7c5cff">1 · compile</text>
+  <text x="40" y="192" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#4aa8ff">2 · build</text>
+  <text x="40" y="332" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#3ee0c8">3 · patch, repack, sign</text>
+
+  <rect x="40" y="70" width="300" height="90" rx="14" fill="#0c1226" stroke="#2a3358"/>
+  <rect x="46" y="84" width="5" height="62" rx="2.5" fill="#7c5cff"/>
+  <text x="68" y="108" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="19" font-weight="700" fill="#e8ecff">APK / DEX</text>
+  <text x="68" y="134" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#8b9ac9">input, filtered by method</text>
+
+  <rect x="450" y="70" width="300" height="90" rx="14" fill="#0c1226" stroke="#2a3358"/>
+  <rect x="456" y="84" width="5" height="62" rx="2.5" fill="#7c5cff"/>
+  <text x="478" y="108" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="19" font-weight="700" fill="#e8ecff">smali crate</text>
+  <text x="478" y="134" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#8b9ac9">parse · disassemble</text>
+
+  <rect x="860" y="70" width="300" height="90" rx="14" fill="#0c1226" stroke="#2a3358"/>
+  <rect x="866" y="84" width="5" height="62" rx="2.5" fill="#7c5cff"/>
+  <text x="888" y="108" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="19" font-weight="700" fill="#e8ecff">dex2rs-core</text>
+  <text x="888" y="134" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#8b9ac9">SSA · types · emit</text>
+
+  <path d="M340 115 h94" stroke="#5a6699" stroke-width="2"/>
+  <path d="M444 115 l-10 -6 v12 z" fill="#8b9ac9"/>
+  <path d="M750 115 h94" stroke="#5a6699" stroke-width="2"/>
+  <path d="M854 115 l-10 -6 v12 z" fill="#8b9ac9"/>
+
+  <rect x="40" y="210" width="300" height="90" rx="14" fill="#0c1226" stroke="#2a3358"/>
+  <rect x="46" y="224" width="5" height="62" rx="2.5" fill="#4aa8ff"/>
+  <text x="68" y="248" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="19" font-weight="700" fill="#e8ecff">generated crate</text>
+  <text x="68" y="274" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#8b9ac9">one module per class</text>
+
+  <rect x="450" y="210" width="300" height="90" rx="14" fill="#0c1226" stroke="#2a3358"/>
+  <rect x="456" y="224" width="5" height="62" rx="2.5" fill="#4aa8ff"/>
+  <text x="478" y="248" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="19" font-weight="700" fill="#e8ecff">cargo ndk</text>
+  <text x="478" y="274" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#8b9ac9">replaces ndk-build</text>
+
+  <rect x="860" y="210" width="300" height="90" rx="14" fill="#0c1226" stroke="#2a3358"/>
+  <rect x="866" y="224" width="5" height="62" rx="2.5" fill="#4aa8ff"/>
+  <text x="888" y="248" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="19" font-weight="700" fill="#e8ecff">lib&lt;name&gt;.so</text>
+  <text x="888" y="274" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#8b9ac9">one per ABI</text>
+
+  <path d="M340 255 h94" stroke="#5a6699" stroke-width="2"/>
+  <path d="M444 255 l-10 -6 v12 z" fill="#8b9ac9"/>
+  <path d="M750 255 h94" stroke="#5a6699" stroke-width="2"/>
+  <path d="M854 255 l-10 -6 v12 z" fill="#8b9ac9"/>
+
+  <rect x="40" y="350" width="300" height="90" rx="14" fill="#0c1226" stroke="#2a3358"/>
+  <rect x="46" y="364" width="5" height="62" rx="2.5" fill="#3ee0c8"/>
+  <text x="68" y="388" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="19" font-weight="700" fill="#e8ecff">patched dex</text>
+  <text x="68" y="414" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#8b9ac9">native stubs · load hook</text>
+
+  <rect x="450" y="350" width="300" height="90" rx="14" fill="#0c1226" stroke="#2a3358"/>
+  <rect x="456" y="364" width="5" height="62" rx="2.5" fill="#3ee0c8"/>
+  <text x="478" y="388" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="19" font-weight="700" fill="#e8ecff">repack</text>
+  <text x="478" y="414" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#8b9ac9">manifest · libs · zip entries</text>
+
+  <rect x="860" y="350" width="300" height="90" rx="14" fill="#0c1226" stroke="#2a3358"/>
+  <rect x="866" y="364" width="5" height="62" rx="2.5" fill="#3ee0c8"/>
+  <text x="888" y="388" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="19" font-weight="700" fill="#e8ecff">signed APK</text>
+  <text x="888" y="414" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#8b9ac9">apksigner.jar, v1+v2+v3</text>
+
+  <path d="M340 395 h94" stroke="#5a6699" stroke-width="2"/>
+  <path d="M444 395 l-10 -6 v12 z" fill="#8b9ac9"/>
+  <path d="M750 395 h94" stroke="#5a6699" stroke-width="2"/>
+  <path d="M854 395 l-10 -6 v12 z" fill="#8b9ac9"/>
+
+  <path d="M1010 160 V178 Q1010 186 1002 186 H198 Q190 186 190 194 V204" fill="none" stroke="#3d4778" stroke-width="2" stroke-dasharray="6 5"/>
+  <path d="M190 210 l-6 -10 h12 z" fill="#8b9ac9"/>
+  <path d="M1010 300 V318 Q1010 326 1002 326 H198 Q190 326 190 334 V344" fill="none" stroke="#3d4778" stroke-width="2" stroke-dasharray="6 5"/>
+  <path d="M190 350 l-6 -10 h12 z" fill="#8b9ac9"/>
+
+  <text x="600" y="486" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#6f7dab">no baksmali/smali round trip through the filesystem · no Android.mk · the converter is self-contained Rust</text>
+</svg>

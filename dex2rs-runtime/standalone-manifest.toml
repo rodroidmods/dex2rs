@@ -1,0 +1,36 @@
+# Manifest of the runtime vendored into a generated project.
+#
+# The in-repo `dex2rs-runtime` inherits `version`/`edition`/`license` from the
+# workspace; a generated project is its own workspace, so the CLI writes this
+# standalone copy of the manifest next to the copied sources.
+[package]
+name = "dex2rs-runtime"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-only"
+description = "On-device JNI runtime that generated dex2rs code links against"
+publish = false
+
+[lib]
+crate-type = ["rlib", "staticlib"]
+
+[features]
+# Emit the per-instruction `LOGD` traces the original wrapped in `#ifdef DEBUG`.
+trace = []
+# Declared because the vendored `src/lib.rs` carries
+# `#[cfg(feature = "vendor-table")] pub mod vendored;` and never enables it, and
+# an undeclared `cfg` would warn on every build of a generated project.
+# `src/vendored.rs` is not vendored: a generated project has nothing to vendor.
+vendor-table = []
+
+[dependencies]
+jni-sys = "0.4.1"
+log = "0.4.34"
+
+[target.'cfg(target_os = "android")'.dependencies]
+# `default-features = false` drops android_logger's `regex` feature, which is on
+# by default and pulls `regex` + `regex-automata` + `aho-corasick` + `memchr`
+# into every generated `libstub.so`. The runtime sets one fixed level and never
+# reads a `RUST_LOG` filter, so the regex engine is dead weight in the shipped
+# library. Keep this line identical to `dex2rs-runtime/Cargo.toml`.
+android_logger = { version = "0.15.1", default-features = false }

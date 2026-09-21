@@ -1,0 +1,23 @@
+[package]
+name = "dex2rs-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+description = "Dalvik bytecode to Rust/JNI AOT compiler core (port of d2c's dex2c package)"
+keywords = ["android", "dex", "compiler", "jni", "obfuscation"]
+categories = ["compilers", "development-tools"]
+
+[dependencies]
+smali = "0.6.2"
+
+[dev-dependencies]
+# `codegen` obfuscates string constants itself, so the runtime's own
+# `obfuscate`/`OBFUSCATE_KEY` are the reference `tests/compile.rs` decodes a
+# generated literal with -- the two have to agree byte for byte, and nothing in
+# the type system would catch them drifting apart.
+dex2rs-runtime = { version = "0.1.0", path = "../dex2rs-runtime", default-features = false }

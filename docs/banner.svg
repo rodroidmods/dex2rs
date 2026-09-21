@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="320" viewBox="0 0 1200 320" role="img" aria-label="dex2rs — Dalvik bytecode to Rust/JNI ahead-of-time compiler">
+  <title>dex2rs</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#090e20"/>
+      <stop offset="0.55" stop-color="#0e1430"/>
+      <stop offset="1" stop-color="#141a3c"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7c5cff"/>
+      <stop offset="0.5" stop-color="#4aa8ff"/>
+      <stop offset="1" stop-color="#3ee0c8"/>
+    </linearGradient>
+    <linearGradient id="wordmark" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#aebcff"/>
+    </linearGradient>
+    <radialGradient id="glowA" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#5b6cff" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#5b6cff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowB" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#3ee0c8" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#3ee0c8" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="320" rx="26" fill="url(#bg)"/>
+  <rect x="0.5" y="0.5" width="1199" height="319" rx="25.5" fill="none" stroke="#2a3358"/>
+  <circle cx="1010" cy="20" r="240" fill="url(#glowA)"/>
+  <circle cx="1160" cy="300" r="210" fill="url(#glowB)"/>
+
+  <rect x="64" y="74" width="80" height="80" rx="20" fill="#141b3d" stroke="url(#accent)" stroke-width="2"/>
+  <text x="104" y="127" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="34" font-weight="700" fill="url(#accent)">d2r</text>
+
+  <text x="164" y="128" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="60" font-weight="800" fill="url(#wordmark)">dex2rs</text>
+  <rect x="166" y="140" width="196" height="4" rx="2" fill="url(#accent)"/>
+  <text x="166" y="172" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#9fb0d9">Dalvik bytecode → Rust/JNI compiler</text>
+  <text x="166" y="197" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#6f7dab">ahead-of-time, no C++ toolchain, drop-in dex2c superset</text>
+
+  <rect x="166" y="214" width="72" height="28" rx="14" fill="#1b2350" stroke="#39457c"/>
+  <text x="202" y="233" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13" fill="#c6d0ff">Rust</text>
+  <rect x="250" y="214" width="250" height="28" rx="14" fill="#1b2350" stroke="#39457c"/>
+  <text x="375" y="233" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13" fill="#c6d0ff">APK/DEX in → signed APK out</text>
+  <rect x="512" y="214" width="124" height="28" rx="14" fill="#1b2350" stroke="#39457c"/>
+  <text x="574" y="233" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13" fill="#c6d0ff">cargo ndk</text>
+
+  <rect x="660" y="76" width="476" height="176" rx="14" fill="#0a1026" stroke="#2a3358"/>
+  <circle cx="684" cy="98" r="5" fill="#ff5f57"/>
+  <circle cx="702" cy="98" r="5" fill="#febc2e"/>
+  <circle cx="720" cy="98" r="5" fill="#28c840"/>
+  <text x="682" y="134" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" fill="#dbe4ff">$ dex2rs -i app.apk -o out.apk \</text>
+  <text x="682" y="158" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" fill="#dbe4ff">    -f filter.txt -p -d -l rodroidnav</text>
+  <text x="682" y="194" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" fill="#3ee0c8">✓ 1 151 methods converted</text>
+  <text x="682" y="218" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" fill="#3ee0c8">✓ librodroidnav.so, arm64-v8a + arm32</text>
+  <text x="682" y="242" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" fill="#3ee0c8">✓ repacked and signed</text>
+
+  <line x1="64" y1="266" x2="1136" y2="266" stroke="#262f57"/>
+
+  <circle cx="66" cy="291" r="3" fill="#3ee0c8"/>
+  <text x="80" y="296" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" fill="#8b9ac9">18 017 / 18 017 methods</text>
+  <circle cx="302" cy="291" r="3" fill="#3ee0c8"/>
+  <text x="316" y="296" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" fill="#8b9ac9">245 modules</text>
+  <circle cx="434" cy="291" r="3" fill="#3ee0c8"/>
+  <text x="448" y="296" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" fill="#8b9ac9">10 quality gates</text>
+  <circle cx="642" cy="291" r="3" fill="#3ee0c8"/>
+  <text x="656" y="296" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" fill="#8b9ac9">0 CFG mismatches</text>
+  <circle cx="862" cy="291" r="3" fill="#3ee0c8"/>
+  <text x="876" y="296" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" fill="#8b9ac9">GPL-3.0</text>
+</svg>

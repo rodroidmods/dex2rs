@@ -1,0 +1,17 @@
+# Rules are made using regex patterns
+#
+# This file selects one application's own classes: Rodroid Dex2RS itself, which
+# is also the reference app for timing a conversion end to end. Everything else
+# the APK carries -- AndroidX, the Kotlin and Compose runtimes, the framework
+# shims -- is left as it is. That is both much faster and the only sane default:
+# the stock filter converts every method in every library, and its own comment
+# says so ("not recommended for real world applications").
+#
+# A rule is matched against `class + method name + prototype`, with the class in
+# JNI form, so `Lcom/rodroid/dex2rs/` covers the package and its subpackages.
+Lcom/rodroid/dex2rs/.*
+
+# The application class is left alone on purpose: the injected loader is built
+# around it, so converting it would be converting the one class that has to
+# survive untouched for the APK to start.
+!Lcom/rodroid/dex2rs/Dex2rsApplication;.*
