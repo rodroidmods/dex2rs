@@ -1,0 +1,60 @@
+name: release
+
+# Builds the prebuilt binaries cargo-binstall looks for, and attaches them to a
+# GitHub release. The asset names are not cosmetic: binstall resolves
+#
+#   https://github.com/rodroidmods/dex2rs/releases/download/v<version>/dex2rs-<target>.tar.gz
+#
+# from the `repository` field in Cargo.toml, so renaming an archive silently
+# turns `cargo binstall dex2rs` back into a source build.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build assets for, e.g. v0.1.0"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+jobs:
+  binaries:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # glibc first: it is what most Linux users have, and binstall tries
+          # this target before falling back to musl.
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu, build-tool: cargo }
+          - { os: ubuntu-latest, target: aarch64-unknown-linux-gnu, build-tool: cross }
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-musl, build-tool: cross }
+          - { os: ubuntu-latest, target: aarch64-unknown-linux-musl, build-tool: cross }
+          - { os: macos-latest, target: aarch64-apple-darwin, build-tool: cargo }
+          - { os: macos-latest, target: x86_64-apple-darwin, build-tool: cargo }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc, build-tool: cargo }
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      # Builds, archives as dex2rs-<target>.tar.gz (or .zip on Windows) with the
+      # binary at the archive root, and uploads to the release for TAG. Creates
+      # the release if the tag push did not.
+      - uses: taiki-e/upload-rust-binary-action@v1
+        with:
+          bin: dex2rs
+          target: ${{ matrix.target }}
+          build-tool: ${{ matrix.build-tool }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          locked: true
+          ref: ${{ env.TAG }}

@@ -70,19 +70,21 @@ apk/dex ──▶ smali crate ──▶ dex2rs-core ─────────�
 ## Quick start
 
 ```bash
-# toolchain
+# toolchain (once)
 cargo install cargo-ndk
 rustup target add aarch64-linux-android        # plus the other ABIs you build
 export ANDROID_NDK_HOME="$HOME/android-sdk/ndk/27.3.13750724"
 
-# build dex2rs
-git clone https://github.com/rodroidil2cppdumper-source/dex2rs
-cd dex2rs && cargo build --release
+# install dex2rs
+cargo install dex2rs           # or: cargo binstall dex2rs — prebuilt, no compile
 
 # convert, build, patch and sign in one run
-./target/release/dex2rs -i app.apk -o app-protected.apk -f filter.txt \
+dex2rs -i app.apk -o app-protected.apk -f filter.txt \
        -p -d -C -k --abis arm64-v8a
 ```
+
+Building from source instead is `git clone https://github.com/rodroidmods/dex2rs &&
+cd dex2rs && cargo build --release`, which puts the binary at `./target/release/dex2rs`.
 
 The filter file says which methods get converted — start with the package you want to
 protect:
@@ -736,7 +738,7 @@ advice.
 
 Built and maintained for the **Rodroid Mods** community.
 
-* Repository: <https://github.com/rodroidil2cppdumper-source/dex2rs>
+* Repository: <https://github.com/rodroidmods/dex2rs>
 * Channel: <https://t.me/+WmudnO0-xoNhMDQ8>
 * Group: <https://t.me/+QylrYL1GNsJiYjc0>
 * Report bugs: <https://t.me/rodroidbugreporter_bot>
