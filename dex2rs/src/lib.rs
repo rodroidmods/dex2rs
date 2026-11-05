@@ -390,7 +390,18 @@ fn opt_level(cli: Option<String>, config: Option<String>) -> Result<String> {
 pub fn run_from(args: &[String]) -> Result<()> {
     let mut argv = vec!["dex2rs".to_string()];
     argv.extend_from_slice(args);
-    let args = Args::try_parse_from(argv)?;
+    // clap reports help, version and usage errors all as `Err`, but only the
+    // last is a failure. `print()` sends help/version to stdout and usage errors
+    // to stderr, `exit_code()` is 0 for the former and 2 for the latter, and it
+    // reports a closed pipe (the usual `dex2rs --help | head`) as an `Err`
+    // instead of panicking the way `print!` does.
+    let args = match Args::try_parse_from(argv) {
+        Ok(args) => args,
+        Err(error) => {
+            let _ = error.print();
+            std::process::exit(error.exit_code());
+        }
+    };
     let config_dir = args
         .config
         .parent()

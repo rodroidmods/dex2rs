@@ -57,4 +57,6 @@ jobs:
           build-tool: ${{ matrix.build-tool }}
           token: ${{ secrets.GITHUB_TOKEN }}
           locked: true
-          ref: ${{ env.TAG }}
+          # The action wants a fully formed ref; GITHUB_REF is only correct on
+          # the tag-push path, so both paths pass the tag explicitly.
+          ref: refs/tags/${{ env.TAG }}
