@@ -1,0 +1,103 @@
+name: convert
+
+# Reusable workflow: one APK in, one converted APK out.
+#
+# The caller (the user's workspace repo) is 12 lines and contains no logic, so
+# this file is the single place conversions are defined and every workspace
+# picks up a fix the moment a new `v1` tag lands.
+#
+# Contract with the client:
+#   input   release asset  input-<job_id>.zip   containing app.apk + filter.txt
+#   output  release asset  output-<job_id>.apk  under the rolling `output` tag
+#   run     display_title == job_id             (workflow_dispatch returns no id)
+#
+# Release assets rather than Actions artifacts on purpose: artifacts count
+# against the 500 MB Actions storage quota of a free private repo, and a few
+# abandoned 50 MB outputs would block every later run, caches included. Assets
+# are deleted by the workflow and by the client after download.
+
+on:
+  workflow_call:
+    inputs:
+      job_id:
+        description: "Identifier of this request; the caller puts it in run-name so the client can find the run."
+        type: string
+        required: true
+      abis:
+        description: "One ABI, e.g. arm64-v8a. The phone only needs its own."
+        type: string
+        default: "arm64-v8a"
+      opt:
+        description: "opt-level for the generated library: z (small) or 3 (fast)."
+        type: string
+        default: "z"
+      api:
+        description: "Android API level to compile against."
+        type: string
+        default: "26"
+      obfuscate:
+        type: boolean
+        default: false
+      dynamic_register:
+        type: boolean
+        default: true
+      compress:
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/rodroidmods/dex2rs-builder:1
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      JOB: ${{ inputs.job_id }}
+    steps:
+      - name: Fetch input
+        run: |
+          set -eu
+          mkdir -p in out
+          gh release download input --pattern 'input-*.zip' --dir in --clobber
+          unzip -q in/input-*.zip -d in
+          test -f in/app.apk
+          test -f in/filter.txt
+          ls -l in
+
+      # Three stages, not one command: each maps to a step in the client's
+      # stepper, and only the middle one is worth caching.
+      - name: Convert to Rust
+        run: |
+          set -eu
+          dex2rs -i in/app.apk -f in/filter.txt -e work/project -b \
+            --abis "${{ inputs.abis }}" --opt-level "${{ inputs.opt }}" \
+            ${{ inputs.obfuscate && '--obfuscate' || '' }} \
+            ${{ inputs.dynamic_register && '--dynamic-register' || '' }}
+
+      - name: Compile
+        working-directory: work/project
+        run: |
+          set -eu
+          cargo ndk -t "${{ inputs.abis }}" -o libs \
+            --platform "${{ inputs.api }}" build --release
+
+      - name: Pack
+        run: |
+          set -eu
+          dex2rs -i in/app.apk -o "out/$JOB.apk" -f in/filter.txt \
+            -e work/project -b -k --abis "${{ inputs.abis }}" \
+            ${{ inputs.compress && '--compress-libs' || '' }}
+
+      - name: Publish
+        run: |
+          set -eu
+          gh release view output >/dev/null 2>&1 \
+            || gh release create output --title output --notes "Converted APKs, deleted after download."
+          gh release upload output "out/$JOB.apk#output-$JOB.apk" --clobber
+          # The input is the user's app; it does not stay around.
+          gh release delete-asset input "input-$JOB.zip" --yes || true
+          ls -l "out/$JOB.apk"

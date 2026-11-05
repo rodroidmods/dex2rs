@@ -1,0 +1,45 @@
+name: builder image
+
+# Builds and publishes the container the convert workflow runs in. Without it,
+# every conversion pays for `cargo install dex2rs` and an NDK download; with it,
+# a run is a pull and a compile.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "docker/**"
+      - ".github/workflows/image.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/builder.Dockerfile
+          push: true
+          # `:1` is the moving tag the convert workflow references; `:sha-…` is
+          # the one to pin to once this has been run and verified.
+          tags: |
+            ghcr.io/rodroidmods/dex2rs-builder:1
+            ghcr.io/rodroidmods/dex2rs-builder:sha-${{ github.sha }}
+
+      - run: echo "digest ${{ steps.build.outputs.digest }}"
