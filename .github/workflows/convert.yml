@@ -95,9 +95,13 @@ jobs:
       - name: Publish
         run: |
           set -eu
+          # Rename on disk: `gh release upload file#label` sets a *display
+          # label*, not the asset name, so the `#` form would leave the asset
+          # called `$JOB.apk` and the client would never find it.
+          cp "out/$JOB.apk" "out/output-$JOB.apk"
           gh release view output >/dev/null 2>&1 \
             || gh release create output --title output --notes "Converted APKs, deleted after download."
-          gh release upload output "out/$JOB.apk#output-$JOB.apk" --clobber
+          gh release upload output "out/output-$JOB.apk" --clobber
           # The input is the user's app; it does not stay around.
           gh release delete-asset input "input-$JOB.zip" --yes || true
-          ls -l "out/$JOB.apk"
+          ls -l "out/output-$JOB.apk"
