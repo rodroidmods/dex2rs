@@ -1,6 +1,9 @@
 [package]
 name = "dex2rs"
-version.workspace = true
+# Pinned rather than inherited: 0.1.1 carries only the --help/--version exit
+# fix, so core and runtime stay at 0.1.0 and there is nothing to republish
+# there. Both dependencies below keep asking for 0.1.0.
+version = "0.1.1"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
