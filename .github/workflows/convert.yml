@@ -83,8 +83,13 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p in out logs
-          gh release download input --pattern 'input-*.zip' --dir in --clobber
-          unzip -q in/input-*.zip -d in
+          # This job's zip, by name. The pattern used to be `input-*.zip`, which reads
+          # as "whatever is there" and stops being true the first time a run fails:
+          # a failed run never reaches the step that deletes its input, so the next
+          # run downloads two archives, `unzip` reads the second as a member name, and
+          # every conversion after the first failure fails in this step.
+          gh release download input --pattern "input-$JOB.zip" --dir in --clobber
+          unzip -q "in/input-$JOB.zip" -d in
           test -f in/app.apk
           test -f in/filter.txt
 
@@ -356,9 +361,14 @@ jobs:
           # called `$JOB.apk` and the client would never find it.
           cp "out/$JOB.apk" "out/output-$JOB.apk"
           gh release upload output "out/output-$JOB.apk" --clobber
-          # The input is the user's app; it does not stay around.
-          gh release delete-asset input "input-$JOB.zip" --yes || true
           # The log is uploaded last so the client sees the final lines, and it
           # is deleted by the client along with the APK.
           gh release upload output "$LOG" --clobber
           ls -l "out/output-$JOB.apk" "$LOG"
+
+      # The user's app does not stay around -- and this is `always()`, because the run
+      # that most needs to clean up is the one that failed. Deleting it only on success
+      # is what let abandoned inputs pile up in the release.
+      - name: Delete the input
+        if: always()
+        run: gh release delete-asset input "input-$JOB.zip" --yes || true
