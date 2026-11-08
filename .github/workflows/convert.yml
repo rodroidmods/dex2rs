@@ -139,10 +139,20 @@ jobs:
           echo "ndk:    $ndk"
           echo "linker: $clang"
 
+          # An APK built for a newer API than the NDK ships is normal -- the NDK lags
+          # Android by a release -- and linking against the newest headers it has is what
+          # `cargo ndk --platform` does too. Clamping here keeps that behaviour instead of
+          # failing on a toolchain that simply does not exist yet.
           if [ ! -x "$clang" ]; then
-            echo "no $clang; the toolchain has:" >&2
-            ls "$bin" | grep -E "^${triple}[0-9]+-clang$" | head -30 >&2 || true
-            exit 3
+            newest=$(ls "$bin" | sed -n "s/^${triple}\([0-9][0-9]*\)-clang$/\1/p" \
+              | sort -n | awk -v want="$api" '$1 <= want' | tail -1)
+            if [ -z "$newest" ]; then
+              echo "no $triple toolchain at or below API $api; the NDK has:" >&2
+              ls "$bin" | grep -E "^${triple}[0-9]+-clang$" | head -30 >&2 || true
+              exit 3
+            fi
+            echo "API $api has no toolchain in this NDK; using API $newest"
+            clang="$bin/${triple}${newest}-clang"
           fi
 
           key=$(echo "$target" | tr 'a-z-' 'A-Z_')
