@@ -33,6 +33,10 @@ jobs:
   binaries:
     name: ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
+    # A token for the canonical repository, so the archives can be attached
+    # there as well. Empty on a fork, in which case the mirror step is skipped.
+    env:
+      RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
     strategy:
       fail-fast: false
       matrix:
@@ -65,3 +69,23 @@ jobs:
           # The action wants a fully formed ref; GITHUB_REF is only correct on
           # the tag-push path, so both paths pass the tag explicitly.
           ref: refs/tags/${{ env.TAG }}
+
+      # The archive just built lives on the repository this workflow ran in,
+      # which is the mirror. `cargo binstall` reads the `repository` field from
+      # the published crate metadata and so always asks the canonical repo for
+      # the file: an archive that only exists on the mirror is never found, and
+      # binstall silently falls back to compiling from source. Attaching an
+      # asset is a REST call, not a job, so the billing lock that stops this
+      # workflow running on the canonical account does not apply to it.
+      - name: Mirror to the canonical release
+        if: env.RELEASE_TOKEN != ''
+        env:
+          GH_TOKEN: ${{ env.RELEASE_TOKEN }}
+        run: |
+          set -eu
+          ext=tar.gz
+          case "${{ matrix.target }}" in
+            *windows*) ext=zip ;;
+          esac
+          gh release upload "$TAG" "dex2rs-${{ matrix.target }}.$ext" \
+            -R rodroidmods/dex2rs --clobber
