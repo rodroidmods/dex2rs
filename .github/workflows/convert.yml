@@ -144,6 +144,33 @@ jobs:
           echo $! > logs/.publisher
           echo "publishing $LOG every 10 s"
 
+      # What the log leaves out, and why it is a file rather than a sed expression in
+      # the two steps that need it.
+      #
+      # The engine is a CLI with its own manual, and several of its messages assume
+      # somebody is driving it by hand: a block telling the reader to run `cargo ndk`
+      # next, which this pipeline does itself; a note that it signed with the embedded
+      # debug key, when this app re-signs with the user's own; and four JVM notices from
+      # a JDK newer than the bundled apksigner. None of them describe what happened, and
+      # all of them read as something going wrong.
+      - name: Define the log filter
+        run: |
+          cat > logs/log.sed <<'SED'
+          s/^ *WARNING: --no-build and no libraries.*/ note: this pass writes the sources only; the Compile step builds the library and the Pack step puts it in the APK./
+          /^ *--no-build: no library in work\/project\/libs to pack/d
+          /^ *sources: work\/project$/d
+          /^ *archive: project-source\.zip$/d
+          /^ *finish: run cargo ndk/d
+          s/^ *--no-build: work\/project\/libs\/\.dex2rs-sources has no build record.*/ note: packing the libraries the Compile step just built./
+          s/^ *--no-build: packing / note: packing /
+          s/^ *keystore\/debug\.keystore is not here.*/ note: signed with the embedded debug key; the app re-signs this APK with your own keystore./
+          s/^WARNING: A restricted method in java\.lang\.System.*/ note: this JDK is newer than the bundled apksigner; a JVM notice, not a signing problem./
+          /^WARNING: java\.lang\.System::loadLibrary/d
+          /^WARNING: Use --enable-native-access/d
+          /^WARNING: Restricted methods will be blocked/d
+          SED
+          echo "LOG_FILTER=$GITHUB_WORKSPACE/logs/log.sed" >> "$GITHUB_ENV"
+
       # --- toolchain -----------------------------------------------------
       #
       # What the container used to provide, assembled in about twenty seconds instead
@@ -282,12 +309,9 @@ jobs:
       - name: Convert to Rust
         run: |
           set -euo pipefail
-          # The one line filtered on its way into the log. `dex2rs -b` warns that the
-          # APK it writes has no library and every converted method will fail to link
-          # -- true of that placeholder, and false of what this pipeline returns: the
-          # next step builds libstub.so and the step after it packs that in. Left in,
-          # it reads as a promise of failure in the middle of a working run.
-          exec > >(sed -u 's/^ *WARNING: --no-build and no libraries.*/ note: this pass writes the sources only; the Compile step builds the library and the Pack step puts it in the APK./' | tee -a "$LOG") 2>&1
+          # Every line that describes a different workflow is rewritten or dropped on its
+          # way into the log; see the filter step above for what and why.
+          exec > >(sed -u -f "$LOG_FILTER" | tee -a "$LOG") 2>&1
           # Published on the way out as well as by the daemon: if the daemon is killed by
           # the runner, a step boundary is still a point the client sees.
           trap 'gh release upload output "$LOG" --clobber >/dev/null 2>&1 || true' EXIT
@@ -341,7 +365,7 @@ jobs:
       - name: Pack
         run: |
           set -euo pipefail
-          exec > >(tee -a "$LOG") 2>&1
+          exec > >(sed -u -f "$LOG_FILTER" | tee -a "$LOG") 2>&1
           trap 'gh release upload output "$LOG" --clobber >/dev/null 2>&1 || true' EXIT
           flags=(-l "${LIB_NAME:-stub}" -c "${CUSTOM_LOADER:-amimo.dcc.DccApplication}")
           if [ "${FORCE_LOADER:-0}" = "1" ]; then flags+=(-r); fi
