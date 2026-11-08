@@ -7,6 +7,11 @@ name: release
 #
 # from the `repository` field in Cargo.toml, so renaming an archive silently
 # turns `cargo binstall dex2rs` back into a source build.
+#
+# The canonical repository cannot run this: its Actions are blocked by a billing
+# flag on the account, and every job dies before it starts. The same file is
+# therefore pushed to the `camptrash7-cmd/dex2rs` mirror, which runs the matrix,
+# and the assets it produces are uploaded to the canonical release.
 
 on:
   push:
