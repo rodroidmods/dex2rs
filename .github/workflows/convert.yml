@@ -160,7 +160,7 @@ jobs:
           /^ *--no-build: no library in work\/project\/libs to pack/d
           /^ *sources: work\/project$/d
           /^ *archive: project-source\.zip$/d
-          /^ *finish: run cargo ndk/d
+          /^ *finish: /d
           s/^ *--no-build: work\/project\/libs\/\.dex2rs-sources has no build record.*/ note: packing the libraries the Compile step just built./
           s/^ *--no-build: packing / note: packing /
           s/^ *keystore\/debug\.keystore is not here.*/ note: signed with the embedded debug key; the app re-signs this APK with your own keystore./
