@@ -186,7 +186,12 @@ jobs:
       - name: Convert to Rust
         run: |
           set -euo pipefail
-          exec > >(tee -a "$LOG") 2>&1
+          # The one line filtered on its way into the log. `dex2rs -b` warns that the
+          # APK it writes has no library and every converted method will fail to link
+          # -- true of that placeholder, and false of what this pipeline returns: the
+          # next step builds libstub.so and the step after it packs that in. Left in,
+          # it reads as a promise of failure in the middle of a working run.
+          exec > >(sed -u 's/^ *WARNING: --no-build and no libraries.*/ note: this pass writes the sources only; the Compile step builds the library and the Pack step puts it in the APK./' | tee -a "$LOG") 2>&1
           # Published on the way out as well as by the daemon: if the daemon is killed by
           # the runner, a step boundary is still a point the client sees.
           trap 'gh release upload output "$LOG" --clobber >/dev/null 2>&1 || true' EXIT
