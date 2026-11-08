@@ -138,26 +138,41 @@ jobs:
 
           ndk="${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-/opt/android-ndk}}"
           bin="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin"
+
+          # The request's `api` is the input APK's minSdkVersion, and old APKs say 1 or
+          # 3. That is not a compile target: the NDK's oldest toolchain is 21, and a
+          # library built against 21 runs on anything that could run the original. So
+          # the number is clamped into the range the image actually has, in both
+          # directions -- a minSdk newer than the NDK's headers is equally normal, since
+          # the NDK lags Android by a release, and `cargo ndk --platform` clamps too.
+          case "$api" in '' | *[!0-9]*) api=26 ;; esac
+          available=$(ls "$bin" | sed -n "s/^${triple}\([0-9][0-9]*\)-clang$/\1/p" | sort -n)
+          if [ -z "$available" ]; then
+            echo "no $triple toolchain in $bin" >&2
+            ls "$bin" | head -40 >&2 || true
+            exit 3
+          fi
+          lowest=$(echo "$available" | head -1)
+          highest=$(echo "$available" | tail -1)
+          if [ "$api" -lt "$lowest" ]; then
+            echo "minSdk $api is older than the NDK's oldest toolchain; compiling against $lowest"
+            api="$lowest"
+          elif [ "$api" -gt "$highest" ]; then
+            echo "minSdk $api is newer than this NDK; compiling against $highest"
+            api="$highest"
+          fi
+
           clang="$bin/${triple}${api}-clang"
 
           echo "abi:    $abi"
           echo "ndk:    $ndk"
+          echo "api:    $api (toolchains $lowest..$highest)"
           echo "linker: $clang"
 
-          # An APK built for a newer API than the NDK ships is normal -- the NDK lags
-          # Android by a release -- and linking against the newest headers it has is what
-          # `cargo ndk --platform` does too. Clamping here keeps that behaviour instead of
-          # failing on a toolchain that simply does not exist yet.
           if [ ! -x "$clang" ]; then
-            newest=$(ls "$bin" | sed -n "s/^${triple}\([0-9][0-9]*\)-clang$/\1/p" \
-              | sort -n | awk -v want="$api" '$1 <= want' | tail -1)
-            if [ -z "$newest" ]; then
-              echo "no $triple toolchain at or below API $api; the NDK has:" >&2
-              ls "$bin" | grep -E "^${triple}[0-9]+-clang$" | head -30 >&2 || true
-              exit 3
-            fi
-            echo "API $api has no toolchain in this NDK; using API $newest"
-            clang="$bin/${triple}${newest}-clang"
+            echo "expected $clang to exist after clamping; the NDK has:" >&2
+            echo "$available" | sed "s/^/  ${triple}/; s/$/-clang/" >&2
+            exit 3
           fi
 
           key=$(echo "$target" | tr 'a-z-' 'A-Z_')
