@@ -25,7 +25,7 @@ on:
         type: string
         required: true
       abis:
-        description: "One ABI, e.g. arm64-v8a. The phone only needs its own."
+        description: "Comma-separated ABIs to build, e.g. arm64-v8a,armeabi-v7a."
         type: string
         default: "arm64-v8a"
       opt:
@@ -49,17 +49,24 @@ on:
 permissions:
   contents: write
 
-# The container's default shell is `sh`, and both the log tee and the linker
-# step use bash-only syntax (`>(...)`, `${var^^}`, indirect expansion).
+# bash everywhere: the log tee and the linker step use bash-only syntax
+# (`>(...)`, `${var//,/ }`, indirect expansion).
 defaults:
   run:
     shell: bash
 
 jobs:
   convert:
+    # Not a `container:` job, and that is a deliberate reversal.
+    #
+    # It used to run in ghcr.io/rodroidmods/dex2rs-builder:1, which carries the whole
+    # toolchain. The catch is that GitHub pulls a job container *before the job starts*,
+    # on a machine that keeps no Docker layers between runs, so every conversion opened
+    # with 68 seconds of "Initialize containers" -- before the first line of the log,
+    # which the client shows as a blank terminal. The runner image already has the Rust
+    # toolchain, the Android NDK, `gh` and a JDK; the only thing the container added was
+    # the `dex2rs` binary, and that is a two-second download from its release.
     runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/rodroidmods/dex2rs-builder:1
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
@@ -67,6 +74,10 @@ jobs:
       # Absolute: the compile step runs in work/project, and the publisher runs
       # from wherever the shell happens to be.
       LOG: ${{ github.workspace }}/logs/log-${{ inputs.job_id }}.txt
+      # The engine, pinned. The release asset it names is what the toolchain step
+      # fetches, and the name is the one `cargo binstall` resolves, so a version bump
+      # here is the only edit a new engine needs.
+      DEX2RS_VERSION: "0.1.1"
     steps:
       - name: Fetch input
         run: |
@@ -76,6 +87,23 @@ jobs:
           unzip -q in/input-*.zip -d in
           test -f in/app.apk
           test -f in/filter.txt
+
+          # The two advanced settings, if the client sent them. Read as text rather than
+          # sourced: this file came out of a zip, and nothing in a zip gets executed. A
+          # client older than these options sends no file at all, which is why every
+          # value falls back to the engine's own default.
+          opt() {
+            if [ -f in/options.txt ]; then
+              sed -n "s/^$1=//p" in/options.txt | head -1 | tr -d '\r'
+            fi
+          }
+          {
+            # The library name becomes a filename (lib<name>.so), so anything that is not
+            # one is replaced rather than allowed to fail later in a path.
+            echo "LIB_NAME=$(opt lib_name | tr -d '\r\n' | tr -c 'A-Za-z0-9_' '_')"
+            echo "CUSTOM_LOADER=$(opt custom_loader)"
+            echo "FORCE_LOADER=$(opt force_custom_loader)"
+          } >> "$GITHUB_ENV"
           ls -l in
 
       # --- live log ------------------------------------------------------
@@ -111,6 +139,62 @@ jobs:
           echo $! > logs/.publisher
           echo "publishing $LOG every 10 s"
 
+      # --- toolchain -----------------------------------------------------
+      #
+      # What the container used to provide, assembled in about twenty seconds instead
+      # of a seventy-second pull. Ordered so the log gets its first useful line early:
+      # the engine first, because it is a download and the client can watch it arrive.
+      - name: Set up the toolchain
+        run: |
+          set -euo pipefail
+          exec > >(tee -a "$LOG") 2>&1
+          trap 'gh release upload output "$LOG" --clobber >/dev/null 2>&1 || true' EXIT
+
+          if ! command -v dex2rs >/dev/null 2>&1; then
+            mkdir -p "$HOME/.local/bin"
+            echo "fetching dex2rs $DEX2RS_VERSION"
+            curl -fsSL --retry 3 \
+              "https://github.com/rodroidmods/dex2rs/releases/download/v${DEX2RS_VERSION}/dex2rs-x86_64-unknown-linux-gnu.tar.gz" \
+              | tar -xz -C "$HOME/.local/bin"
+            echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+            export PATH="$HOME/.local/bin:$PATH"
+          fi
+          dex2rs --version
+
+          # The std for each target. `rustup` is part of the runner image; a missing
+          # toolchain is worth stopping on, because every later step needs it.
+          if ! command -v rustup >/dev/null 2>&1; then
+            echo "rustup is not on this runner; the image changed" >&2
+            exit 3
+          fi
+          rustup target add \
+            aarch64-linux-android \
+            armv7-linux-androideabi \
+            i686-linux-android \
+            x86_64-linux-android
+
+          # The NDK, from wherever this runner keeps it. The image's own variables come
+          # first; the two paths below are the ones the hosted images use, and the loop
+          # takes the last match so a newer NDK wins over an older one.
+          ndk="${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-${ANDROID_NDK_LATEST_HOME:-}}}"
+          has_ndk() { [ -n "$1" ] && [ -x "$1/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar" ]; }
+          if ! has_ndk "$ndk"; then
+            ndk=""
+            for candidate in /opt/android-ndk /usr/local/lib/android/sdk/ndk/* "${ANDROID_HOME:-/usr/local/lib/android/sdk}/ndk/"*; do
+              if has_ndk "$candidate"; then ndk="$candidate"; fi
+            done
+          fi
+          if [ -z "$ndk" ]; then
+            echo "no Android NDK on this runner; looked in ANDROID_NDK_HOME and the SDK" >&2
+            ls /usr/local/lib/android/sdk 2>/dev/null >&2 || true
+            exit 3
+          fi
+          echo "ndk:    $ndk"
+          {
+            echo "ANDROID_NDK_HOME=$ndk"
+            echo "ANDROID_NDK_ROOT=$ndk"
+          } >> "$GITHUB_ENV"
+
       # --- build ---------------------------------------------------------
       #
       # The linker is set from the NDK explicitly, and the target is built with
@@ -126,60 +210,67 @@ jobs:
       - name: Point cargo at the NDK
         run: |
           set -euo pipefail
-          abi="${{ inputs.abis }}"
+          abis="${{ inputs.abis }}"
           api="${{ inputs.api }}"
-          case "$abi" in
-            arm64-v8a)   target=aarch64-linux-android;   triple=aarch64-linux-android ;;
-            armeabi-v7a) target=armv7-linux-androideabi; triple=armv7a-linux-androideabi ;;
-            x86)         target=i686-linux-android;      triple=i686-linux-android ;;
-            x86_64)      target=x86_64-linux-android;    triple=x86_64-linux-android ;;
-            *) echo "unsupported ABI: $abi" >&2; exit 2 ;;
-          esac
 
-          ndk="${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-/opt/android-ndk}}"
+          ndk="${ANDROID_NDK_HOME:?the toolchain step did not run}"
           bin="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin"
 
-          # The request's `api` is the input APK's minSdkVersion, and old APKs say 1 or
-          # 3. That is not a compile target: the NDK's oldest toolchain is 21, and a
-          # library built against 21 runs on anything that could run the original. So
-          # the number is clamped into the range the image actually has, in both
-          # directions -- a minSdk newer than the NDK's headers is equally normal, since
-          # the NDK lags Android by a release, and `cargo ndk --platform` clamps too.
-          case "$api" in '' | *[!0-9]*) api=26 ;; esac
-          available=$(ls "$bin" | sed -n "s/^${triple}\([0-9][0-9]*\)-clang$/\1/p" | sort -n)
-          if [ -z "$available" ]; then
-            echo "no $triple toolchain in $bin" >&2
-            ls "$bin" | head -40 >&2 || true
-            exit 3
-          fi
-          lowest=$(echo "$available" | head -1)
-          highest=$(echo "$available" | tail -1)
-          if [ "$api" -lt "$lowest" ]; then
-            echo "minSdk $api is older than the NDK's oldest toolchain; compiling against $lowest"
-            api="$lowest"
-          elif [ "$api" -gt "$highest" ]; then
-            echo "minSdk $api is newer than this NDK; compiling against $highest"
-            api="$highest"
-          fi
+          # One iteration per requested ABI. Every target gets its own linker
+          # variable, because `cargo build --target` reads the one for the
+          # target it is building and the Compile step builds them in a loop.
+          for abi in ${abis//,/ }; do
+            case "$abi" in
+              arm64-v8a)   target=aarch64-linux-android;   triple=aarch64-linux-android ;;
+              armeabi-v7a) target=armv7-linux-androideabi; triple=armv7a-linux-androideabi ;;
+              x86)         target=i686-linux-android;      triple=i686-linux-android ;;
+              x86_64)      target=x86_64-linux-android;    triple=x86_64-linux-android ;;
+              *) echo "unsupported ABI: $abi" >&2; exit 2 ;;
+            esac
 
-          clang="$bin/${triple}${api}-clang"
+            # The request's `api` is the input APK's minSdkVersion, and old APKs say 1 or
+            # 3. That is not a compile target: the NDK's oldest toolchain is 21, and a
+            # library built against 21 runs on anything that could run the original. So
+            # the number is clamped into the range the image actually has, in both
+            # directions -- a minSdk newer than the NDK's headers is equally normal, since
+            # the NDK lags Android by a release, and `cargo ndk --platform` clamps too.
+            level="$api"
+            case "$level" in '' | *[!0-9]*) level=26 ;; esac
+            available=$(ls "$bin" | sed -n "s/^${triple}\([0-9][0-9]*\)-clang$/\1/p" | sort -n)
+            if [ -z "$available" ]; then
+              echo "no $triple toolchain in $bin" >&2
+              ls "$bin" | head -40 >&2 || true
+              exit 3
+            fi
+            lowest=$(echo "$available" | head -1)
+            highest=$(echo "$available" | tail -1)
+            if [ "$level" -lt "$lowest" ]; then
+              echo "minSdk $level is older than the NDK's oldest toolchain; compiling $abi against $lowest"
+              level="$lowest"
+            elif [ "$level" -gt "$highest" ]; then
+              echo "minSdk $level is newer than this NDK; compiling $abi against $highest"
+              level="$highest"
+            fi
 
-          echo "abi:    $abi"
-          echo "ndk:    $ndk"
-          echo "api:    $api (toolchains $lowest..$highest)"
-          echo "linker: $clang"
+            clang="$bin/${triple}${level}-clang"
 
-          if [ ! -x "$clang" ]; then
-            echo "expected $clang to exist after clamping; the NDK has:" >&2
-            echo "$available" | sed "s/^/  ${triple}/; s/$/-clang/" >&2
-            exit 3
-          fi
+            echo "abi:    $abi"
+            echo "ndk:    $ndk"
+            echo "api:    $level (toolchains $lowest..$highest)"
+            echo "linker: $clang"
 
-          key=$(echo "$target" | tr 'a-z-' 'A-Z_')
-          {
-            echo "CARGO_TARGET_${key}_LINKER=$clang"
-            echo "CARGO_TARGET_${key}_AR=$bin/llvm-ar"
-          } >> "$GITHUB_ENV"
+            if [ ! -x "$clang" ]; then
+              echo "expected $clang to exist after clamping; the NDK has:" >&2
+              echo "$available" | sed "s/^/  ${triple}/; s/$/-clang/" >&2
+              exit 3
+            fi
+
+            key=$(echo "$target" | tr 'a-z-' 'A-Z_')
+            {
+              echo "CARGO_TARGET_${key}_LINKER=$clang"
+              echo "CARGO_TARGET_${key}_AR=$bin/llvm-ar"
+            } >> "$GITHUB_ENV"
+          done
 
       # Three stages, not one command: each maps to a step in the client's
       # stepper, and only the middle one is worth caching.
@@ -195,7 +286,15 @@ jobs:
           # Published on the way out as well as by the daemon: if the daemon is killed by
           # the runner, a step boundary is still a point the client sees.
           trap 'gh release upload output "$LOG" --clobber >/dev/null 2>&1 || true' EXIT
-          dex2rs -i in/app.apk -f in/filter.txt -e work/project -b \
+          # The library name and loader the client asked for. Both the build and the pack
+          # pass need them: the first names the .so, the second looks for that name.
+          flags=(-l "${LIB_NAME:-stub}" -c "${CUSTOM_LOADER:-amimo.dcc.DccApplication}")
+          if [ "${FORCE_LOADER:-0}" = "1" ]; then flags+=(-r); fi
+          # `-k` for the same reason the pack pass has it: without it an input APK that
+          # ships its own libraries decides the ABI list and the user's switches are
+          # ignored from the very first pass.
+          dex2rs -i in/app.apk -f in/filter.txt -e work/project -b -k \
+            "${flags[@]}" \
             --abis "${{ inputs.abis }}" --opt-level "${{ inputs.opt }}" \
             ${{ inputs.obfuscate && '--obfuscate' || '' }} \
             ${{ inputs.dynamic_register && '--dynamic-register' || '' }}
@@ -207,38 +306,42 @@ jobs:
           exec > >(tee -a "$LOG") 2>&1
           trap 'gh release upload output "$LOG" --clobber >/dev/null 2>&1 || true' EXIT
 
-          abi="${{ inputs.abis }}"
-          case "$abi" in
-            arm64-v8a)   target=aarch64-linux-android ;;
-            armeabi-v7a) target=armv7-linux-androideabi ;;
-            x86)         target=i686-linux-android ;;
-            x86_64)      target=x86_64-linux-android ;;
-            *) echo "unsupported ABI: $abi" >&2; exit 2 ;;
-          esac
+          abis="${{ inputs.abis }}"
+          for abi in ${abis//,/ }; do
+            case "$abi" in
+              arm64-v8a)   target=aarch64-linux-android ;;
+              armeabi-v7a) target=armv7-linux-androideabi ;;
+              x86)         target=i686-linux-android ;;
+              x86_64)      target=x86_64-linux-android ;;
+              *) echo "unsupported ABI: $abi" >&2; exit 2 ;;
+            esac
 
-          key=$(echo "$target" | tr 'a-z-' 'A-Z_')
-          linker_var="CARGO_TARGET_${key}_LINKER"
-          if [ -z "${!linker_var:-}" ]; then
-            echo "$linker_var is not set; the NDK step did not run" >&2
-            exit 3
-          fi
-          echo "linking with ${!linker_var}"
+            key=$(echo "$target" | tr 'a-z-' 'A-Z_')
+            linker_var="CARGO_TARGET_${key}_LINKER"
+            if [ -z "${!linker_var:-}" ]; then
+              echo "$linker_var is not set; the NDK step did not run" >&2
+              exit 3
+            fi
+            echo "building $abi with ${!linker_var}"
 
-          cargo build --release --target "$target"
+            cargo build --release --target "$target"
 
-          # Same layout `cargo ndk -o libs` produces, which is where the pack
-          # step looks for the library.
-          mkdir -p "libs/$abi"
-          cp target/"$target"/release/lib*.so "libs/$abi/"
-          ls -l "libs/$abi"
+            # Same layout `cargo ndk -o libs` produces, which is where the pack
+            # step looks for the library.
+            mkdir -p "libs/$abi"
+            cp target/"$target"/release/lib*.so "libs/$abi/"
+            ls -l "libs/$abi"
+          done
 
       - name: Pack
         run: |
           set -euo pipefail
           exec > >(tee -a "$LOG") 2>&1
           trap 'gh release upload output "$LOG" --clobber >/dev/null 2>&1 || true' EXIT
+          flags=(-l "${LIB_NAME:-stub}" -c "${CUSTOM_LOADER:-amimo.dcc.DccApplication}")
+          if [ "${FORCE_LOADER:-0}" = "1" ]; then flags+=(-r); fi
           dex2rs -i in/app.apk -o "out/$JOB.apk" -f in/filter.txt \
-            -e work/project -b -k --abis "${{ inputs.abis }}" \
+            -e work/project -b -k --abis "${{ inputs.abis }}" "${flags[@]}" \
             ${{ inputs.compress && '--compress-libs' || '' }}
 
       - name: Publish
