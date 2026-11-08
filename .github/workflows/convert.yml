@@ -94,6 +94,11 @@ jobs:
           : > "$LOG"
           gh release view output >/dev/null 2>&1 \
             || gh release create output --title output --notes "Converted APKs, deleted after download."
+          # Published once before the daemon starts: the client opens its terminal as
+          # soon as this asset exists, and waiting for the first ten-second tick leaves
+          # it blank for that long on a job that has already been queued for a minute.
+          echo "run $GITHUB_RUN_ID started on the runner" >> "$LOG"
+          gh release upload output "$LOG" --clobber >/dev/null 2>&1 || true
           # `nohup` and a detached stdout: the runner closes a step's output pipe when the
           # step ends, and a process still holding it can be killed with it. `$LOG` comes
           # from the job environment, so the child inherits it.
