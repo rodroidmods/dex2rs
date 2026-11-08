@@ -9,6 +9,7 @@ name: convert
 # Contract with the client:
 #   input   release asset  input-<job_id>.zip   containing app.apk + filter.txt
 #   output  release asset  output-<job_id>.apk  under the rolling `output` tag
+#   log     release asset  log-<job_id>.txt     under the same tag, rewritten while the run goes
 #   run     display_title == job_id             (workflow_dispatch returns no id)
 #
 # Release assets rather than Actions artifacts on purpose: artifacts count
@@ -48,6 +49,12 @@ on:
 permissions:
   contents: write
 
+# The container's default shell is `sh`, and both the log tee and the linker
+# step use bash-only syntax (`>(...)`, `${var^^}`, indirect expansion).
+defaults:
+  run:
+    shell: bash
+
 jobs:
   convert:
     runs-on: ubuntu-latest
@@ -57,22 +64,102 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
       JOB: ${{ inputs.job_id }}
+      # Absolute: the compile step runs in work/project, and the publisher runs
+      # from wherever the shell happens to be.
+      LOG: ${{ github.workspace }}/logs/log-${{ inputs.job_id }}.txt
     steps:
       - name: Fetch input
         run: |
-          set -eu
-          mkdir -p in out
+          set -euo pipefail
+          mkdir -p in out logs
           gh release download input --pattern 'input-*.zip' --dir in --clobber
           unzip -q in/input-*.zip -d in
           test -f in/app.apk
           test -f in/filter.txt
           ls -l in
 
+      # --- live log ------------------------------------------------------
+      #
+      # The client polls `log-<job>.txt` while the run goes, which is the only
+      # way to show the runner's output before the job ends: GitHub's own logs
+      # endpoint answers 404 until a job is complete. So the file is uploaded
+      # repeatedly, and each step appends to it with `tee`.
+      #
+      # The uploader is a background process rather than a step, because steps
+      # are sequential: a publisher that only ran between them could not show
+      # anything *during* the one step that matters, the compile.
+      - name: Start the live log
+        run: |
+          set -euo pipefail
+          : > "$LOG"
+          gh release view output >/dev/null 2>&1 \
+            || gh release create output --title output --notes "Converted APKs, deleted after download."
+          # `nohup` and a detached stdout: the runner closes a step's output pipe when the
+          # step ends, and a process still holding it can be killed with it. `$LOG` comes
+          # from the job environment, so the child inherits it.
+          nohup bash -c '
+            while true; do
+              sleep 10
+              gh release upload output "$LOG" --clobber >/dev/null 2>&1 || true
+            done
+          ' >/dev/null 2>&1 &
+          echo $! > logs/.publisher
+          echo "publishing $LOG every 10 s"
+
+      # --- build ---------------------------------------------------------
+      #
+      # The linker is set from the NDK explicitly, and the target is built with
+      # `cargo build --target` rather than `cargo ndk`. The reason is a failure
+      # that reads like a missing NDK and is not one: rustc invoked *cargo-ndk*
+      # as the linker, the host linker ran instead of the NDK's clang, and the
+      # errors were `cannot open crtbegin_so.o` and `unable to find library
+      # -llog`. Whatever put that value there -- an image, a stray
+      # `.cargo/config.toml` in the workspace, an inherited variable -- this
+      # step no longer depends on it: the path is derived from the NDK that is
+      # actually on disk, checked, and exported, and the build is asked for the
+      # target directly.
+      - name: Point cargo at the NDK
+        run: |
+          set -euo pipefail
+          abi="${{ inputs.abis }}"
+          api="${{ inputs.api }}"
+          case "$abi" in
+            arm64-v8a)   target=aarch64-linux-android;   triple=aarch64-linux-android ;;
+            armeabi-v7a) target=armv7-linux-androideabi; triple=armv7a-linux-androideabi ;;
+            x86)         target=i686-linux-android;      triple=i686-linux-android ;;
+            x86_64)      target=x86_64-linux-android;    triple=x86_64-linux-android ;;
+            *) echo "unsupported ABI: $abi" >&2; exit 2 ;;
+          esac
+
+          ndk="${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-/opt/android-ndk}}"
+          bin="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          clang="$bin/${triple}${api}-clang"
+
+          echo "abi:    $abi"
+          echo "ndk:    $ndk"
+          echo "linker: $clang"
+
+          if [ ! -x "$clang" ]; then
+            echo "no $clang; the toolchain has:" >&2
+            ls "$bin" | grep -E "^${triple}[0-9]+-clang$" | head -30 >&2 || true
+            exit 3
+          fi
+
+          key=$(echo "$target" | tr 'a-z-' 'A-Z_')
+          {
+            echo "CARGO_TARGET_${key}_LINKER=$clang"
+            echo "CARGO_TARGET_${key}_AR=$bin/llvm-ar"
+          } >> "$GITHUB_ENV"
+
       # Three stages, not one command: each maps to a step in the client's
       # stepper, and only the middle one is worth caching.
       - name: Convert to Rust
         run: |
-          set -eu
+          set -euo pipefail
+          exec > >(tee -a "$LOG") 2>&1
+          # Published on the way out as well as by the daemon: if the daemon is killed by
+          # the runner, a step boundary is still a point the client sees.
+          trap 'gh release upload output "$LOG" --clobber >/dev/null 2>&1 || true' EXIT
           dex2rs -i in/app.apk -f in/filter.txt -e work/project -b \
             --abis "${{ inputs.abis }}" --opt-level "${{ inputs.opt }}" \
             ${{ inputs.obfuscate && '--obfuscate' || '' }} \
@@ -81,27 +168,59 @@ jobs:
       - name: Compile
         working-directory: work/project
         run: |
-          set -eu
-          cargo ndk -t "${{ inputs.abis }}" -o libs \
-            --platform "${{ inputs.api }}" build --release
+          set -euo pipefail
+          exec > >(tee -a "$LOG") 2>&1
+          trap 'gh release upload output "$LOG" --clobber >/dev/null 2>&1 || true' EXIT
+
+          abi="${{ inputs.abis }}"
+          case "$abi" in
+            arm64-v8a)   target=aarch64-linux-android ;;
+            armeabi-v7a) target=armv7-linux-androideabi ;;
+            x86)         target=i686-linux-android ;;
+            x86_64)      target=x86_64-linux-android ;;
+            *) echo "unsupported ABI: $abi" >&2; exit 2 ;;
+          esac
+
+          key=$(echo "$target" | tr 'a-z-' 'A-Z_')
+          linker_var="CARGO_TARGET_${key}_LINKER"
+          if [ -z "${!linker_var:-}" ]; then
+            echo "$linker_var is not set; the NDK step did not run" >&2
+            exit 3
+          fi
+          echo "linking with ${!linker_var}"
+
+          cargo build --release --target "$target"
+
+          # Same layout `cargo ndk -o libs` produces, which is where the pack
+          # step looks for the library.
+          mkdir -p "libs/$abi"
+          cp target/"$target"/release/lib*.so "libs/$abi/"
+          ls -l "libs/$abi"
 
       - name: Pack
         run: |
-          set -eu
+          set -euo pipefail
+          exec > >(tee -a "$LOG") 2>&1
+          trap 'gh release upload output "$LOG" --clobber >/dev/null 2>&1 || true' EXIT
           dex2rs -i in/app.apk -o "out/$JOB.apk" -f in/filter.txt \
             -e work/project -b -k --abis "${{ inputs.abis }}" \
             ${{ inputs.compress && '--compress-libs' || '' }}
 
       - name: Publish
         run: |
-          set -eu
+          set -euo pipefail
+          # The publisher is about to be redundant: stop it before the final
+          # upload so two `gh release upload`s cannot race over one asset.
+          kill "$(cat logs/.publisher)" 2>/dev/null || true
+
           # Rename on disk: `gh release upload file#label` sets a *display
           # label*, not the asset name, so the `#` form would leave the asset
           # called `$JOB.apk` and the client would never find it.
           cp "out/$JOB.apk" "out/output-$JOB.apk"
-          gh release view output >/dev/null 2>&1 \
-            || gh release create output --title output --notes "Converted APKs, deleted after download."
           gh release upload output "out/output-$JOB.apk" --clobber
           # The input is the user's app; it does not stay around.
           gh release delete-asset input "input-$JOB.zip" --yes || true
-          ls -l "out/output-$JOB.apk"
+          # The log is uploaded last so the client sees the final lines, and it
+          # is deleted by the client along with the APK.
+          gh release upload output "$LOG" --clobber
+          ls -l "out/output-$JOB.apk" "$LOG"
