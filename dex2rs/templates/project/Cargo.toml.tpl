@@ -14,7 +14,9 @@ path = "src/lib.rs"
 
 [dependencies]
 # `runtime/` is a copy of the `dex2rs-runtime` crate, exactly like the original
-# project shipped `jni/nc/*.cpp` inside the generated project folder.
+# project shipped `jni/nc/*.cpp` inside the generated project folder. `--trace`
+# and `--watchdog` rewrite this line to add their feature; both are off by
+# default, and neither changes what is generated.
 dex2rs-runtime = { path = "runtime", default-features = false }
 jni-sys = "0.4"
 

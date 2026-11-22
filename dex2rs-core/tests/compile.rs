@@ -27,12 +27,22 @@ fn invoke_const_class() -> SmaliClass {
 
 /// Compile one method to Rust source.
 fn compile(source: &SmaliClass, name: &str) -> String {
+    compile_with(source, name, false)
+}
+
+/// Compile one method with the freeze watchdog's per-method name turned on.
+fn compile_with_watchdog(source: &SmaliClass, name: &str) -> String {
+    compile_with(source, name, true)
+}
+
+fn compile_with(source: &SmaliClass, name: &str, watchdog: bool) -> String {
     let method = source
         .methods
         .iter()
         .find(|m| m.name == name)
         .unwrap_or_else(|| panic!("fixture has a method named {name}"));
-    let input = decode_method(source, method, false, false).expect("decode");
+    let mut input = decode_method(source, method, false, false).expect("decode");
+    input.watchdog = watchdog;
     let builder = IrBuilder::new(&input);
     let irmethod = builder.process().expect("compile");
     irmethod.get_source().expect("codegen")
@@ -168,19 +178,38 @@ fn string_escapes_are_decoded_once() {
     );
 }
 
-/// The freeze guard is emitted into every method: `d2c::spin_report` names the
-/// method and state if the dispatcher ever re-enters a state without leaving it,
-/// which is how a freeze is diagnosed without a `--trace` build.
-///
-/// The `d2c::watch()` guard is the other half and is just as load-bearing: the
-/// watchdog slot has to be handed back when the method returns, or a method that
-/// has returned is indistinguishable from one that is still running, and a
-/// freeze is reported in a state the dispatcher cannot loop in.
+/// The freeze guard is emitted into every method: `d2c::spin_report` reports the
+/// state if the dispatcher ever re-enters one without leaving it, which is how a
+/// freeze is diagnosed without a `--trace` build. It costs two compares per
+/// transition, so it is not part of what `--watchdog` buys.
 #[test]
 fn every_method_has_the_freeze_guard() {
     let rust = compile(&class(), "add");
     assert!(rust.contains("d2c::spin_report(__state);"), "{rust}");
     assert!(rust.contains("if __state == __prev_state {"), "{rust}");
+}
+
+/// The watchdog is opt-in. A default build must not carry the per-method name:
+/// it is ~100 bytes of `.rodata` each, and nothing reads it until the method has
+/// already stopped, so on a real app the names were the single largest thing
+/// that could be removed without touching what the code does.
+#[test]
+fn the_watchdog_is_off_by_default() {
+    let rust = compile(&class(), "add");
+    assert!(!rust.contains("d2c::probe("), "no name in a default build: {rust}");
+    assert!(
+        !rust.contains("d2c::watch()"),
+        "no frame guard in a default build: {rust}"
+    );
+}
+
+/// With `--watchdog` the sampler is told which method is running, and the slot
+/// is handed back when the method returns -- otherwise a method that has
+/// returned is indistinguishable from one that is still running, and a freeze is
+/// reported in a state the dispatcher cannot loop in.
+#[test]
+fn the_watchdog_names_the_method_when_asked() {
+    let rust = compile_with_watchdog(&class(), "add");
     assert!(
         rust.contains("d2c::probe(b\"Java_com_example_Hello_add__II\", __state);"),
         "the watchdog must be told which method is running: {rust}"

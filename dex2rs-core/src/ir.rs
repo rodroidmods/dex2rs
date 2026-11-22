@@ -1082,6 +1082,11 @@ pub struct Ir {
     /// for a large share of the generated source and the original only logged
     /// in debug builds).
     pub trace: bool,
+    /// Emit `d2c::watch()`/`d2c::probe(...)`: the freeze watchdog needs the
+    /// method's name in the library to report a frozen frame by name, which is
+    /// ~100 bytes of `.rodata` per converted method. Opt-in, because a shipped
+    /// build only reads it after something has already gone wrong.
+    pub watchdog: bool,
     pub registers_size: i64,
     pub ins_size: i64,
     pub var_versions: BTreeMap<i64, u32>,

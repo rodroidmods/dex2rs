@@ -107,27 +107,47 @@ fn write_file(path: &Path, contents: &str) -> Result<()> {
     write_if_changed(path, contents)
 }
 
-/// Turn the runtime's `trace` feature on/off in a generated project.
+/// Set the runtime features a generated project is built with.
 ///
-/// `d2c::trace(...)` is a no-op unless the feature is enabled, so without this a
-/// `--trace` build would produce the calls and log nothing on the device.
-pub fn set_trace_feature(project_dir: &Path, enabled: bool) -> Result<()> {
-    const PLAIN: &str = "dex2rs-runtime = { path = \"runtime\", default-features = false }";
-    const TRACED: &str =
-        "dex2rs-runtime = { path = \"runtime\", default-features = false, features = [\"trace\"] }";
+/// `d2c::trace(...)` is a no-op unless `trace` is enabled, and the freeze
+/// watchdog cannot name a frame unless `watchdog` is, so a project generated
+/// with `--trace` or `--watchdog` has to say so in its own manifest. Both are
+/// off by default and the dependency line is rewritten whole, so the two flags
+/// cannot leave each other's feature behind on a reused `-e` tree.
+pub fn set_runtime_features(project_dir: &Path, trace: bool, watchdog: bool) -> Result<()> {
+    let mut features: Vec<&str> = Vec::new();
+    if trace {
+        features.push("\"trace\"");
+    }
+    if watchdog {
+        features.push("\"watchdog\"");
+    }
+    let line = if features.is_empty() {
+        "dex2rs-runtime = { path = \"runtime\", default-features = false }".to_string()
+    } else {
+        format!(
+            "dex2rs-runtime = {{ path = \"runtime\", default-features = false, features = [{}] }}",
+            features.join(", ")
+        )
+    };
     let path = project_dir.join("Cargo.toml");
     let text =
         std::fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
-    let (from, to) = if enabled {
-        (PLAIN, TRACED)
-    } else {
-        (TRACED, PLAIN)
-    };
-    if !text.contains(from) {
+    let mut out = String::with_capacity(text.len() + line.len());
+    let mut found = false;
+    for existing in text.lines() {
+        if existing.trim_start().starts_with("dex2rs-runtime") && existing.contains("path") {
+            out.push_str(&line);
+            found = true;
+        } else {
+            out.push_str(existing);
+        }
+        out.push('\n');
+    }
+    if !found {
         return Ok(());
     }
-    std::fs::write(&path, text.replace(from, to))
-        .with_context(|| format!("writing {}", path.display()))?;
+    std::fs::write(&path, out).with_context(|| format!("writing {}", path.display()))?;
     Ok(())
 }
 
@@ -997,7 +1017,7 @@ mod tests {
     }
 
     #[test]
-    fn trace_feature_is_toggled_in_the_manifest() {
+    fn runtime_features_are_toggled_in_the_manifest() {
         let dir = std::env::temp_dir().join(format!("dex2rs-scaffold-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(
@@ -1005,12 +1025,28 @@ mod tests {
             "[package]\nname = \"stub\"\n\n[dependencies]\ndex2rs-runtime = { path = \"runtime\", default-features = false }\n",
         )
         .unwrap();
-        set_trace_feature(&dir, true).unwrap();
-        let text = std::fs::read_to_string(dir.join("Cargo.toml")).unwrap();
-        assert!(text.contains("features = [\"trace\"]"), "{text}");
-        set_trace_feature(&dir, false).unwrap();
-        let text = std::fs::read_to_string(dir.join("Cargo.toml")).unwrap();
-        assert!(!text.contains("features = [\"trace\"]"), "{text}");
+        let read = || std::fs::read_to_string(dir.join("Cargo.toml")).unwrap();
+
+        set_runtime_features(&dir, true, false).unwrap();
+        assert!(read().contains("features = [\"trace\"]"), "{}", read());
+
+        set_runtime_features(&dir, false, true).unwrap();
+        let text = read();
+        assert!(text.contains("features = [\"watchdog\"]"), "{text}");
+        assert!(!text.contains("\"trace\""), "the flags must not accumulate: {text}");
+
+        set_runtime_features(&dir, true, true).unwrap();
+        let text = read();
+        assert!(text.contains("features = [\"trace\", \"watchdog\"]"), "{text}");
+
+        set_runtime_features(&dir, false, false).unwrap();
+        let text = read();
+        assert!(!text.contains("features = ["), "{text}");
+        assert_eq!(
+            text.matches("dex2rs-runtime").count(),
+            1,
+            "one dependency line, rewritten in place: {text}"
+        );
         std::fs::remove_dir_all(&dir).ok();
     }
 

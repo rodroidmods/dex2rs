@@ -494,7 +494,13 @@ impl<'a> Writer<'a> {
         // so any method that is called repeatedly (or a thread that has ended)
         // is reported as frozen forever, in a state the dispatcher physically
         // cannot loop in. See `watchdog::watch`.
-        self.writeln("        let d2c_watch = d2c::watch();");
+        //
+        // Opt-in (`--watchdog`): the guard and the name `probe` stores are
+        // diagnostics for a frame that has already stopped, and the name alone
+        // is ~100 bytes of `.rodata` per converted method.
+        if self.ir.watchdog {
+            self.writeln("        let d2c_watch = d2c::watch();");
+        }
         // Name the method for the trace: with `--trace` every instruction is
         // logged, so without this a logcat tail shows an instruction loop with
         // no way to tell which method it came from.
@@ -541,10 +547,16 @@ impl<'a> Writer<'a> {
         // the method and state when the app stops making progress, which is the
         // only way a freeze inside a converted method can be diagnosed on a
         // device (a spinning thread produces no crash and no ANR backtrace).
-        self.fmt(format_args!(
-            "            d2c::probe({}, __state);\n",
-            bytes_literal(jni_name.as_bytes())
-        ));
+        //
+        // Opt-in (`--watchdog`). The freeze guard below stays either way: it is
+        // two compares per transition and catches a codegen bug on the spot,
+        // while the name is the part that costs `.rodata` per method.
+        if self.ir.watchdog {
+            self.fmt(format_args!(
+                "            d2c::probe({}, __state);\n",
+                bytes_literal(jni_name.as_bytes())
+            ));
+        }
         self.writeln("            if __state == __prev_state {");
         self.writeln("                __spins = __spins.saturating_add(1);");
         self.fmt(format_args!(

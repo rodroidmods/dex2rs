@@ -72,6 +72,10 @@ pub struct MethodInput {
     /// `LOGD`-style tracing of every instruction; off by default (see
     /// [`crate::ir::Ir::trace`]).
     pub trace: bool,
+    /// Name every method in the runtime's freeze watchdog. Off by default: the
+    /// per-method name is ~100 bytes of `.rodata` that no shipped build reads
+    /// unless something is already frozen. See [`crate::ir::Ir::watchdog`].
+    pub watchdog: bool,
 }
 
 impl MethodInput {
@@ -419,5 +423,6 @@ pub fn decode_method(
         // The C++ writer emitted `LOGD` lines for every instruction; they are
         // opt-in here because they dwarf the generated code on real apps.
         trace: false,
+        watchdog: false,
     })
 }

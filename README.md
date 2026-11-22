@@ -296,6 +296,7 @@ dex2rs -i app.apk -o app-protected.apk -f filter.txt -l rodroidnav \
 | `--api` | API level for the build (default: the input's `minSdkVersion`) |
 | `--keep-debug-info` | keep the dex debug tables (dropped by default) |
 | `--trace` | compile per-instruction tracing into the generated code |
+| `--watchdog` | name every method in the freeze watchdog (~100 bytes of `.rodata` each; off by default) |
 | `--config` | defaults file (default `dcc.cfg`) |
 
 ### Compression
@@ -488,6 +489,30 @@ generated — `tools/cfg_diff.py` and `tools/arm_check.py` read the generated
 source, not the object code, and are unaffected. The setting is per run: pass
 `--opt-level` / `--outline-common`, or declare `"opt_level"` / `"outline_common"`
 in `dcc.cfg`, which is what makes it stick; the CLI wins over the file.
+
+Two more levers do not touch the optimizer at all:
+
+| change | arm64 `libstub.so` | what it removes |
+|---|---|---|
+| default | 6.38 MB | — |
+| watchdog off (the default since `--watchdog` became opt-in) | 5.65 MB | 519 KB of method names in `.rodata`, 154 KB of `.text` |
+| `-d, --dynamic-register` | 6.06 MB | `.dynstr` 524 KB → 688 B |
+| **both** | **5.33 MB** | **−16.5%** |
+
+Measured on 4 812 converted methods of a real app, arm64, API 26, `opt-level z`.
+The watchdog names are the largest removable item: one `b"Java_..."` per method,
+and nothing reads them until a converted method has already stopped, which is
+what `--watchdog` is for. `--dynamic-register` moves the same names into a single
+`RegisterNatives` table and stops exporting one symbol per method — it is also
+what an `--obfuscate` build wants, since the export list otherwise spells out
+every converted method in `.dynstr`.
+
+`armv7` comes out larger than `arm64` on the same tree (~15%), and that is
+codegen rather than configuration: `.rodata` and `.dynstr` match to within 3%,
+and the whole difference is `.text`. Thumb-2 with `+vfp3d16` and no NEON has no
+64-bit registers, so the `long`/`double` traffic in every Dalvik method becomes
+pairs of 32-bit operations. A trivial method is still ~52 bytes of machine code
+on both — the size is the method bodies, not per-method scaffolding.
 
 Measured on the outlined build — 1 690 236 instructions of `.text` — the outliner
 produced:

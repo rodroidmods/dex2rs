@@ -54,6 +54,8 @@ pub struct DccConfig {
     pub obfuscate: bool,
     /// Emit `LOGD`-style traces for every instruction (large output).
     pub trace: bool,
+    /// Name every method in the freeze watchdog (~100 bytes of `.rodata` each).
+    pub watchdog: bool,
     pub dynamic_register: bool,
     pub skip_synthetic: bool,
     pub allow_init: bool,

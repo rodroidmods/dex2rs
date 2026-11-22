@@ -131,6 +131,17 @@ struct Args {
     #[arg(long, help_heading = "Method selection")]
     trace: bool,
 
+    /// Name every method in the freeze watchdog, so a frozen frame reports the
+    /// method and state it stopped in
+    ///
+    /// Off by default. Each name is ~100 bytes of `.rodata` in the library and
+    /// nothing reads it unless a converted method has already stopped making
+    /// progress: on a 4 812-method app the names alone were 519 KB of a 6.38 MB
+    /// library. The freeze guard itself stays either way -- only the name is
+    /// what this pays for.
+    #[arg(long, help_heading = "Size")]
+    watchdog: bool,
+
     /// Encrypt string constants and the reflection names (classes, methods,
     /// fields, and the RegisterNatives table), decrypting them at the call
     #[arg(short = 'p', long, help_heading = "Protection")]
@@ -254,6 +265,7 @@ struct Options {
     output: Option<String>,
     obfuscate: bool,
     trace: bool,
+    watchdog: bool,
     dynamic_register: bool,
     filter: String,
     custom_loader: String,
@@ -307,6 +319,7 @@ impl Options {
                 .or_else(|| config.output.clone().filter(|value| !value.is_empty())),
             obfuscate: DccConfig::flag_or(args.obfuscate, config.obfuscate),
             trace: DccConfig::flag_or(args.trace, config.trace),
+            watchdog: DccConfig::flag_or(args.watchdog, config.watchdog),
             dynamic_register: DccConfig::flag_or(args.dynamic_register, config.dynamic_register),
             filter: pick(&args.filter, "filter.txt", &config.filter),
             custom_loader: pick(
@@ -499,7 +512,7 @@ fn convert(options: Options) -> Result<()> {
         options.dynamic_register,
         options.obfuscate,
     )?;
-    scaffold::set_trace_feature(&project_dir, options.trace)?;
+    scaffold::set_runtime_features(&project_dir, options.trace, options.watchdog)?;
     scaffold::set_opt_level(&project_dir, &options.opt_level)?;
     scaffold::set_outline_common(&project_dir, options.outline_common)?;
 
@@ -826,6 +839,7 @@ fn compile_method(class: &SmaliClass, method: &SmaliMethod, options: &Options) -
     )
     .map_err(anyhow::Error::msg)?;
     input.trace = options.trace;
+    input.watchdog = options.watchdog;
     let ir_method = dex2rs_core::ssa::IrBuilder::new(&input)
         .process()
         .map_err(anyhow::Error::msg)?;

@@ -127,6 +127,8 @@ pub struct IrBuilder<'a> {
     pub dynamic_register: bool,
     /// Emit per-instruction traces into the generated source.
     pub trace: bool,
+    /// Emit the watchdog's per-method name and frame guard.
+    pub watchdog: bool,
 }
 
 impl<'a> IrBuilder<'a> {
@@ -146,6 +148,7 @@ impl<'a> IrBuilder<'a> {
             obfus: input.obfus,
             dynamic_register: input.dynamic_register,
             trace: input.trace,
+            watchdog: input.watchdog,
         }
     }
 
@@ -167,6 +170,7 @@ impl<'a> IrBuilder<'a> {
         self.ir.dynamic_register = self.dynamic_register;
         self.ir.obfus = self.obfus;
         self.ir.trace = self.trace;
+        self.ir.watchdog = self.watchdog;
         self.ir.registers_size = input.registers_size as i64;
         self.ir.ins_size = input.ins_size as i64;
 
