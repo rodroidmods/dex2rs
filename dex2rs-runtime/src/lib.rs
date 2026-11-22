@@ -69,13 +69,39 @@ pub mod invoke;
 pub mod jni;
 pub mod ops;
 pub mod resolve;
+/// The freeze watchdog. Off by default: `--watchdog` is what puts the calls in
+/// the generated code, and this is the other half of that switch.
+#[cfg(feature = "watchdog")]
 pub mod watchdog;
 
 pub use invoke::*;
 pub use jni::*;
 pub use ops::*;
 pub use resolve::*;
+#[cfg(feature = "watchdog")]
 pub use watchdog::*;
+
+/// The guard [`watch`] returns when the watchdog is compiled out. A zero-sized
+/// value, so the generated `let d2c_watch = d2c::watch();` costs nothing even in
+/// a project whose Cargo.toml still names the call.
+#[cfg(not(feature = "watchdog"))]
+pub struct Watch;
+
+/// Claim the calling thread's frame for the watchdog, or do nothing.
+///
+/// The generated code only emits this call under `--watchdog`, but a project
+/// that was generated with it and then built without the runtime feature still
+/// has to link.
+#[cfg(not(feature = "watchdog"))]
+#[inline(always)]
+pub fn watch() -> Watch {
+    Watch
+}
+
+/// Record `(method, state)` for the sampler, or do nothing.
+#[cfg(not(feature = "watchdog"))]
+#[inline(always)]
+pub fn probe(_name: &'static [u8], _state: i64) {}
 
 /// The wrapped JNI environment type (`jni_sys::JNIEnv`).
 pub type JNIEnv = jni_sys::JNIEnv;
@@ -347,11 +373,19 @@ pub fn log_error(msg: &str) {
 #[cold]
 #[inline(never)]
 pub fn spin_report(state: i64) {
+    #[cfg(feature = "watchdog")]
     log::error!(
         "dex2rs: FREEZE in {} at state {state}: that block never leaves its state, \
          so the dispatcher re-runs it forever. This is a compiler bug -- report \
          this line together with the app it came from.",
         watchdog::current_method_name()
+    );
+    #[cfg(not(feature = "watchdog"))]
+    log::error!(
+        "dex2rs: FREEZE at state {state}: that block never leaves its state, so the \
+         dispatcher re-runs it forever. This is a compiler bug -- report this line \
+         together with the app it came from, and rebuild with --watchdog to name \
+         the method in this message."
     );
 }
 

@@ -35,9 +35,19 @@ crate-type = ["cdylib"]
 name = "vendored_sources"
 required-features = ["vendor-table"]
 
+# The watchdog is off by default now; its own tests have to ask for it, or they
+# would exercise the empty stubs and fail for the wrong reason.
+[[test]]
+name = "watchdog"
+required-features = ["watchdog"]
+
 [features]
 # Emit the per-instruction `LOGD` traces the original wrapped in `#ifdef DEBUG`.
 trace = []
+# Name every converted method in the freeze watchdog. `--watchdog` turns this on
+# and puts the calls in the generated code; without it the sampler cannot name a
+# frozen frame, and the per-method names stay out of the library.
+watchdog = []
 # Expose `vendored::SOURCES` / `vendored::STANDALONE_MANIFEST`, the table `dex2rs`
 # uses to vendor this crate into a generated project. Off by default: a generated
 # project's own copy of the runtime declares the feature (so `cfg` stays quiet)
